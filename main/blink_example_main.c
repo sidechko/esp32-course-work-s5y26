@@ -1,11 +1,3 @@
-/* Blink Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -34,7 +26,7 @@ static const char* TAG = "CW";
 #define DISPLAY_ADDRESS 0x3c
 #define PN532_ADDRESS 0x24
 
-#define BATTERY_GPIO_33 32
+#define BATTERY_GPIO 32
 #define BATTERY_ADC ADC_CHANNEL_4
 
 #define I2C_TICKS_TO_WAIT 500
@@ -56,8 +48,7 @@ int adc_raw = 0;
 int acb_seg_count = 0;
 int selected_num = 0;
 int selected_menu = 4;
-bool menu = false;
-uint8_t state_changed = UINT8_MAX;
+uint8_t state_changed = 0b1110;
 
 //function
 void display_static_content();
@@ -68,7 +59,9 @@ void display_acb();
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    if (menu)
+    if(state_changed & 0b10000)
+        return;
+    if (state_changed & 0b0001)
     {
         switch (selected_menu)
         {
@@ -82,17 +75,19 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
             //TODO USE
             break;
         default:
-            state_changed |= 0b00000100;
             selected_menu = 4;
             break;
         }
     }
     else
     {
-        state_changed |= 0b00000100;
         selected_menu = 3;
     }
-    menu = !menu;
+    state_changed |= 0b0010;
+    state_changed ^= 1;
+    // isr lock
+    state_changed |= 0b10000;
+    ESP_EARLY_LOGI(TAG, "isr state: %d", state_changed);
 }
 
 void init()
@@ -189,7 +184,6 @@ void init()
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     gpio_isr_handler_add(ENCODER_SW_GPIO, gpio_isr_handler, NULL);
 
-
     //GPIO 33 accum v
     adc_oneshot_unit_init_cfg_t init_config1 = {
         .unit_id = ADC_UNIT_1,
@@ -209,19 +203,20 @@ void app_main(void)
 {
     init();
     //MAIN LOOP
+    display_static_content();
     while (true)
     {
         if (tick++ != 0) continue;
 
         ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, BATTERY_ADC, &adc_raw));
         if(recalc_acb_seg())
-            state_changed |= 0b00000001;
+            state_changed |= 0b1000;
 
         ESP_ERROR_CHECK(pcnt_unit_get_count(pcnt_unit, &pulse_count));
         int diff = (pulse_count - prev_pulse_count) / 2;
         if (diff != 0)
         {
-            if (menu)
+            if (state_changed & 0b0001)
             {
                 if (pulse_count == 0 && diff / 20 > 1)
                     diff = diff < 0 ? -1 : 1;
@@ -230,7 +225,7 @@ void app_main(void)
                     selected_menu = 0;
                 else if (selected_menu < 0)
                     selected_menu = 3;
-                state_changed |= 0b00000100;
+                state_changed |= 0b0010;
             }
             else
             {
@@ -241,24 +236,21 @@ void app_main(void)
                     selected_num = 0;
                 else if (selected_num < 0)
                     selected_num = 20;
-                state_changed |= 0b00000010;
+                state_changed |= 0b0100;
             }
             prev_pulse_count = pulse_count;
         }
 
-
-        if (state_changed != 0)
-        {
-            if (upd_count++ % 32 == 0)
-                ssd1306_clear_screen(&dev, false);
-
-            display_static_content();
+        if (state_changed & 0b1000){
             display_acb();
-            display_selected_number();
-            display_selected_menu();
-
-            state_changed = 0;
         }
+        if (state_changed & 0b0100){
+            display_selected_number();
+        }
+        if (state_changed & 0b0010){
+            display_selected_menu();
+        }
+        state_changed &= 0b0001;
     }
 }
 
@@ -315,10 +307,6 @@ void display_acb()
 
 void display_static_content()
 {
-    ssd1306_bitmaps(&dev, 0, 14, hud_button_read, 40, 9, false);
-    ssd1306_bitmaps(&dev, 0, 24, hud_button_write, 40, 9, false);
-    ssd1306_bitmaps(&dev, 0, 34, hud_button_use, 40, 9, false);
-    ssd1306_bitmaps(&dev, 0, 44, hud_button_exit, 40, 9, false);
     ssd1306_bitmaps(&dev, 76, 15, hud_slash, 16, 34, false);
     ssd1306_bitmaps(&dev, 92, 15, seg2, 16, 34, false);
     ssd1306_bitmaps(&dev, 108, 15, seg0, 16, 34, false);
@@ -373,20 +361,8 @@ void display_selected_number()
 
 void display_selected_menu()
 {
-    switch (selected_menu)
-    {
-    case 0:
-        ssd1306_bitmaps(&dev, 0, 14, hud_button_read, 40, 9, true);
-        break;
-    case 1:
-        ssd1306_bitmaps(&dev, 0, 24, hud_button_write, 40, 9, true);
-        break;
-    case 2:
-        ssd1306_bitmaps(&dev, 0, 34, hud_button_use, 40, 9, true);
-        break;
-    case 3:
-        ssd1306_bitmaps(&dev, 0, 44, hud_button_exit, 40, 9, true);
-        break;
-    default: break;
-    }
+    ssd1306_bitmaps(&dev, 0, 14, hud_button_read, 40, 9, selected_menu == 0);
+    ssd1306_bitmaps(&dev, 0, 24, hud_button_write, 40, 9, selected_menu == 1);
+    ssd1306_bitmaps(&dev, 0, 34, hud_button_use, 40, 9, selected_menu == 2);
+    ssd1306_bitmaps(&dev, 0, 44, hud_button_exit, 40, 9, selected_menu == 3);
 }
