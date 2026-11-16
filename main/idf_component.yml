@@ -3,5 +3,5 @@ dependencies:
     path: components/ssd1306/
     git: https://github.com/nopnop2002/esp-idf-ssd1306.git
   harihara-1869/pn532_driver:
-    path: components/pn532_driver_emulate/
-    git: https://github.com/harihara-1869/pn532_driver
+    path: components/pn532/
+    git: https://github.com/harihara-1869/pn532_driver.git

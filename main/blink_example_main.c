@@ -275,7 +275,7 @@ void display_acb()
         hud_acb[y*4+3] &= 0x03;
     }
     uint8_t map[] = {0x80, 0x00, 0x00, 0x02};
-    int c = adc_raw * 3 + 1;
+    int c = adc_raw * 7 / 2 + 1;
     int mv = 0;
     for (int _m = 0; _m < 4; _m++)
     {
@@ -290,11 +290,11 @@ void display_acb()
     }
     for (int _m = 0; _m < 4; _m++)
     {
-        hud_acb[4+_m] = map[_m];
-        hud_acb[8+_m] = map[_m];
-        hud_acb[12+_m] = map[_m];
-        hud_acb[16+_m] = map[_m];
-        hud_acb[20+_m] = map[_m];
+        hud_acb[4+_m] |= map[_m];
+        hud_acb[8+_m] |= map[_m];
+        hud_acb[12+_m] |= map[_m];
+        hud_acb[16+_m] |= map[_m];
+        hud_acb[20+_m] |= map[_m];
     }
     ssd1306_bitmaps(&dev, 0, 0, hud_acb, 32, 7, false);
 }
