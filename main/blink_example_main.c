@@ -50,10 +50,10 @@ i2c_master_dev_handle_t pn532_handle;
 
 // APP STATE
 int prev_pulse_count = 0;
-int prev_adc_raw = 0;
 int pulse_count = 0;
 int adc_raw = 0;
 
+int acb_seg_count = 0;
 int selected_num = 0;
 int selected_menu = 4;
 bool menu = false;
@@ -63,6 +63,7 @@ uint8_t state_changed = UINT8_MAX;
 void display_static_content();
 void display_selected_number();
 void display_selected_menu();
+bool recalc_acb_seg();
 void display_acb();
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
@@ -213,12 +214,8 @@ void app_main(void)
         if (tick++ != 0) continue;
 
         ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, BATTERY_ADC, &adc_raw));
-        adc_raw = adc_raw >> 9;
-        if (adc_raw != prev_adc_raw)
-        {
+        if(recalc_acb_seg())
             state_changed |= 0b00000001;
-            prev_adc_raw = adc_raw;
-        }
 
         ESP_ERROR_CHECK(pcnt_unit_get_count(pcnt_unit, &pulse_count));
         int diff = (pulse_count - prev_pulse_count) / 2;
@@ -265,6 +262,23 @@ void app_main(void)
     }
 }
 
+int prev_after_eval = 0;
+bool recalc_acb_seg(){
+    if(adc_raw < 1302)
+        adc_raw = 1302;
+    else if(adc_raw > 2562)
+        adc_raw = 2562;
+    if(prev_after_eval << 5 == adc_raw << 5)
+        return false;
+    prev_after_eval = adc_raw;
+    int count = 29 - ((2562 - adc_raw) / 42);
+    if(acb_seg_count != count){
+        acb_seg_count = count;
+        return true;
+    }
+    return false;
+}
+
 void display_acb()
 {
     for (int y = 1; y < 6; y++)
@@ -275,7 +289,7 @@ void display_acb()
         hud_acb[y*4+3] &= 0x03;
     }
     uint8_t map[] = {0x80, 0x00, 0x00, 0x02};
-    int c = adc_raw * 7 / 2 + 1;
+    int c = acb_seg_count + 1;
     int mv = 0;
     for (int _m = 0; _m < 4; _m++)
     {
