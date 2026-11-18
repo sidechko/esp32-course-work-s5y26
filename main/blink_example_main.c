@@ -1,14 +1,19 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_timer.h"
 
 #include "driver/gpio.h"
 #include "driver/pulse_cnt.h"
 
 #include "ssd1306.h"
 #include "display_content.h"
+
+#include "pn532.h"
+#include "pn532_driver_i2c.h"
 
 static const char* TAG = "CW";
 
@@ -22,7 +27,7 @@ static const char* TAG = "CW";
 
 #define I2C_SCL_GPIO 22
 #define I2C_SDA_GPIO 21
-#define I2C_MASTER_FREQ_HZ 100000
+#define I2C_MASTER_FREQ_HZ 400000
 #define DISPLAY_ADDRESS 0x3c
 #define PN532_ADDRESS 0x24
 
@@ -31,24 +36,41 @@ static const char* TAG = "CW";
 
 #define I2C_TICKS_TO_WAIT 500
 
+#define MAX_UID_LEN 10
+
 //DEVICES
-SSD1306_t dev;
 pcnt_unit_handle_t pcnt_unit;
 adc_oneshot_unit_handle_t adc1_handle;
 
 i2c_master_bus_handle_t bus_handle;
-i2c_master_dev_handle_t pn532_handle;
+// i2c_master_dev_handle_t pn532_handle;
+SSD1306_t dev;
+pn532_io_t pn532_io;
 
+#define BUTTON_CLICK_BIT 16
+#define ACB_UPDATE_BIT 8
+#define NUM_CHANGE_BIT 4
+#define MENU_CHANGE_BIT 2
+#define MENU_ACTIVE_BIT 1
 
 // APP STATE
 int prev_pulse_count = 0;
 int pulse_count = 0;
 int adc_raw = 0;
 
+// LOG STATE
 int acb_seg_count = 0;
 int selected_num = 0;
 int selected_menu = 4;
-uint8_t state_changed = 0b1110;
+/*
+    0bABCDE
+    A - Menu click bit
+    B - ACB state change bit
+    C - Number change bit
+    D - Menu selected entry change bit
+    E - Menu change bit
+*/
+uint8_t state_changed = 0b01110;
 
 //function
 void display_static_content();
@@ -56,38 +78,20 @@ void display_selected_number();
 void display_selected_menu();
 bool recalc_acb_seg();
 void display_acb();
+esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid);
 
+#define MIN_INTERVAL_US 1000
+static volatile int64_t last_isr_time = 0;
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    if(state_changed & 0b10000)
+    int now = esp_timer_get_time();
+    if (now - last_isr_time < MIN_INTERVAL_US)
         return;
-    if (state_changed & 0b0001)
-    {
-        switch (selected_menu)
-        {
-        case 0:
-            //TODO READ
-            break;
-        case 1:
-            //TODO WRITE
-            break;
-        case 2:
-            //TODO USE
-            break;
-        default:
-            selected_menu = 4;
-            break;
-        }
-    }
-    else
-    {
-        selected_menu = 3;
-    }
-    state_changed |= 0b0010;
-    state_changed ^= 1;
-    // isr lock
-    state_changed |= 0b10000;
-    ESP_EARLY_LOGI(TAG, "isr state: %d", state_changed);
+    if(state_changed & BUTTON_CLICK_BIT)
+        return;
+    last_isr_time = now;
+    state_changed |= BUTTON_CLICK_BIT;
+    ESP_EARLY_LOGI(TAG,"Click!");
 }
 
 void init()
@@ -129,13 +133,35 @@ void init()
     ssd1306_clear_screen(&dev, false);
     ssd1306_contrast(&dev, 0xff);
 
-    //I2C slave np532
-    i2c_device_config_t pn532_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = PN532_ADDRESS,
-        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
-    };
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &pn532_cfg, &pn532_handle));
+    //I2C slave pn532
+
+    ESP_ERROR_CHECK(pn532_new_driver_i2c(GPIO_NUM_NC, GPIO_NUM_NC, -1, -1, I2C_NUM_0, &pn532_io));
+    esp_err_t err;
+    do {
+        err = pn532_init(&pn532_io);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "failed to initialize PN532");
+            pn532_release(&pn532_io);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+    } while(err != ESP_OK);
+
+    ESP_LOGI(TAG, "get firmware version");
+    uint32_t version_data = 0;
+    do {
+        err = pn532_get_firmware_version(&pn532_io, &version_data);
+        if (ESP_OK != err) {
+            ESP_LOGI(TAG, "Didn't find PN53x board");
+            pn532_reset(&pn532_io);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+    } while (ESP_OK != err);
+
+    // Log firmware infos
+    ESP_LOGI(TAG, "Found chip PN5%x", (unsigned int)(version_data >> 24) & 0xFF);
+    ESP_LOGI(TAG, "Firmware ver. %d.%d", (int)(version_data >> 16) & 0xFF, (int)(version_data >> 8) & 0xFF);
+
+    ESP_ERROR_CHECK(pn532_init(&pn532_io));
 
 
     //ENCODER
@@ -194,10 +220,20 @@ void init()
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, BATTERY_ADC, &config));
+
+    esp_log_level_set("_ssd1306_bitmaps", ESP_LOG_INFO);
+    esp_log_level_set("ssd1306_copy_bit", ESP_LOG_INFO);
+    esp_log_level_set("PN532", ESP_LOG_DEBUG);
+    
 }
 
 uint8_t tick = 0;
 uint8_t upd_count = 0;
+
+
+#define MIFARE_BLOCK_SIZE 16
+uint8_t block_data[MIFARE_BLOCK_SIZE];
+uint8_t curr_uid[7];
 
 void app_main(void)
 {
@@ -208,15 +244,17 @@ void app_main(void)
     {
         if (tick++ != 0) continue;
 
+        //INPUT
         ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, BATTERY_ADC, &adc_raw));
         if(recalc_acb_seg())
-            state_changed |= 0b1000;
+            state_changed |= ACB_UPDATE_BIT;
+        vTaskDelay(pdMS_TO_TICKS(10));
 
         ESP_ERROR_CHECK(pcnt_unit_get_count(pcnt_unit, &pulse_count));
         int diff = (pulse_count - prev_pulse_count) / 2;
         if (diff != 0)
         {
-            if (state_changed & 0b0001)
+            if (state_changed & MENU_ACTIVE_BIT)
             {
                 if (pulse_count == 0 && diff / 20 > 1)
                     diff = diff < 0 ? -1 : 1;
@@ -225,7 +263,7 @@ void app_main(void)
                     selected_menu = 0;
                 else if (selected_menu < 0)
                     selected_menu = 3;
-                state_changed |= 0b0010;
+                state_changed |= MENU_CHANGE_BIT;
             }
             else
             {
@@ -236,21 +274,55 @@ void app_main(void)
                     selected_num = 0;
                 else if (selected_num < 0)
                     selected_num = 20;
-                state_changed |= 0b0100;
+                state_changed |= NUM_CHANGE_BIT;
             }
             prev_pulse_count = pulse_count;
         }
+        
+        //WORK
+        if(state_changed & BUTTON_CLICK_BIT){
+            state_changed ^= BUTTON_CLICK_BIT;
+            ESP_LOGI(TAG,"Handle");
 
-        if (state_changed & 0b1000){
+            if(state_changed & MENU_ACTIVE_BIT){
+                switch(selected_menu){
+                    case 0:
+                        ESP_LOGI(TAG,"Selected: %d",selected_menu);
+                        esp_err_t err = read_mifare_classic_block(4, block_data, curr_uid);
+                        if (err == ESP_OK) {
+                            ESP_LOG_BUFFER_HEX("UUID", curr_uid, 7);
+                            ESP_LOG_BUFFER_HEX("Mifare block 4", block_data, MIFARE_BLOCK_SIZE);
+                        } else {
+                            ESP_LOGE("Mifare", "Read failed: %s", esp_err_to_name(err));
+                        }
+                        break;
+                    case 1:
+                    case 2:
+                    default:
+                        break;
+                }
+                selected_menu = 4;
+            }
+            else{
+                selected_menu = 0;
+            }
+            state_changed ^= MENU_ACTIVE_BIT;
+            state_changed |= MENU_CHANGE_BIT;
+        }
+
+        //DISPLAY
+        if (state_changed & ACB_UPDATE_BIT){
             display_acb();
         }
-        if (state_changed & 0b0100){
+        if (state_changed & NUM_CHANGE_BIT){
             display_selected_number();
         }
-        if (state_changed & 0b0010){
+        if (state_changed & MENU_CHANGE_BIT){
             display_selected_menu();
         }
-        state_changed &= 0b0001;
+
+
+        state_changed &= MENU_ACTIVE_BIT;
     }
 }
 
@@ -365,4 +437,45 @@ void display_selected_menu()
     ssd1306_bitmaps(&dev, 0, 24, hud_button_write, 40, 9, selected_menu == 1);
     ssd1306_bitmaps(&dev, 0, 34, hud_button_use, 40, 9, selected_menu == 2);
     ssd1306_bitmaps(&dev, 0, 44, hud_button_exit, 40, 9, selected_menu == 3);
+}
+
+
+esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid) {
+    uint8_t uid[7];
+    uint8_t uid_len;
+    uint8_t response[32];
+    uint8_t response_len;
+    ESP_LOGI(TAG, "Start");
+
+    esp_err_t err = pn532_read_passive_target_id(&pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_len, 0);
+    if (err != ESP_OK) return err;
+    ESP_LOGD(TAG, "pn532_read_passive_target_id OK");
+
+    // 2. Выбор карты
+    err = pn532_in_list_passive_target(&pn532_io);
+    if (err != ESP_OK) return err;
+    ESP_LOGD(TAG, "pn532_in_list_passive_target OK");
+
+    // 3. UID для аутентификации (последние 4 байта для 7-байтных карт)
+    const uint8_t *auth_uid = (uid_len == 7) ? &uid[3] : uid;
+
+    // 4. Аутентификация сектора ключом A
+    uint8_t key_a[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t auth_cmd[] = {
+        MIFARE_CMD_AUTH_A, block_number,
+        key_a[0], key_a[1], key_a[2], key_a[3], key_a[4], key_a[5],
+        auth_uid[0], auth_uid[1], auth_uid[2], auth_uid[3]
+    };
+    response_len = sizeof(response);
+    err = pn532_in_data_exchange(&pn532_io, auth_cmd, sizeof(auth_cmd), response, &response_len);
+    if (err != ESP_OK) return err;
+
+    // 5. Чтение блока
+    uint8_t read_cmd[] = {MIFARE_CMD_READ, block_number};
+    response_len = sizeof(response);
+    err = pn532_in_data_exchange(&pn532_io, read_cmd, sizeof(read_cmd), response, &response_len);
+    if (err != ESP_OK) return err;
+
+    memcpy(out_data, response, MIFARE_BLOCK_SIZE);
+    return ESP_OK;
 }
