@@ -5,7 +5,7 @@
 #ifndef CWS5Y26_BATTERY_H
 #define CWS5Y26_BATTERY_H
 #include "esp_adc/adc_oneshot.h"
-#include "../state_info.h"
+#include "core.h"
 
 void init_battery_oneshot(adc_oneshot_unit_handle_t* adc1_handle, adc_unit_t unit, adc_atten_t atten, adc_bitwidth_t bitwidth, adc_channel_t adc_channel);
 bool recalc_acb_seg(int adc_raw, int * prev_after_eval, int * acb_seg_count);

@@ -1,9 +1,8 @@
 //
 // Created by s1pepega on 21.11.2026.
 //
-#include "../display.h"
-#include "ssd1306.h"
-#include "../display_content.h"
+#include "display.h"
+#include "display_content.h"
 
 void init_i2c_display(i2c_master_bus_handle_t bus_handle, i2c_device_config_t * config, int address, SSD1306_t* dev)
 {

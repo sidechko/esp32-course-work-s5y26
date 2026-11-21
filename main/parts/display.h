@@ -5,7 +5,7 @@
 #ifndef CWS5Y26_DISPLAY_H
 #define CWS5Y26_DISPLAY_H
 #include "ssd1306.h"
-#include "../state_info.h"
+#include "core.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
 

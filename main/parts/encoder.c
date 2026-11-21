@@ -1,7 +1,7 @@
 //
 // Created by s1pepega on 21.11.2026.
 //
-#include "../encoder.h"
+#include "encoder.h"
 
 
 void init_encoder(pcnt_unit_handle_t * pcnt_unit, int min, int max, uint32_t glitch, int clk_gpio, int dt_gpio)
