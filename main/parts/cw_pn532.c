@@ -240,7 +240,7 @@ esp_err_t pn532_gen1a_unlock(pn532_t* dev) {
 }
 
 esp_err_t emulate_mifare_card(pn532_t* dev, mifare_card_data_handle_t card_h) {
-    if (dev == NULL || card_h == NULL || card_h->block_data == NULL) {
+    if (dev == nullptr || card_h == nullptr || card_h->block_data == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -293,7 +293,7 @@ esp_err_t emulate_mifare_card(pn532_t* dev, mifare_card_data_handle_t card_h) {
         uint8_t tg_data_cmd = 0x86; // TgGetData
         uint8_t tg_data_response[64];
         size_t tg_data_len = sizeof(tg_data_response);
-        success = pn532_execute_command(dev, tg_data_cmd, NULL, 0, tg_data_response, &tg_data_len, 1000);
+        success = pn532_execute_command(dev, tg_data_cmd, nullptr, 0, tg_data_response, &tg_data_len, 1000);
 
         if (success && tg_data_len > 0) {
             // Анализ полученной команды от считывателя

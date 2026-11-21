@@ -20,13 +20,13 @@ void init_encoder(pcnt_unit_handle_t * pcnt_unit, int min, int max, uint32_t gli
         .edge_gpio_num = clk_gpio,
         .level_gpio_num = dt_gpio,
     };
-    pcnt_channel_handle_t pcnt_chan_a = NULL;
+    pcnt_channel_handle_t pcnt_chan_a = nullptr;
     ESP_ERROR_CHECK(pcnt_new_channel(*pcnt_unit, &chan_a_config, &pcnt_chan_a));
     pcnt_chan_config_t chan_b_config = {
         .edge_gpio_num = dt_gpio,
         .level_gpio_num = clk_gpio,
     };
-    pcnt_channel_handle_t pcnt_chan_b = NULL;
+    pcnt_channel_handle_t pcnt_chan_b = nullptr;
     ESP_ERROR_CHECK(pcnt_new_channel(*pcnt_unit, &chan_b_config, &pcnt_chan_b));
     ESP_ERROR_CHECK(
         pcnt_channel_set_edge_action(pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE
@@ -83,5 +83,5 @@ void init_encoder_button(int sw_gpio, gpio_isr_t gpio_isr_handler)
     gpio_set_pull_mode(sw_gpio, GPIO_FLOATING);
     gpio_set_intr_type(sw_gpio, GPIO_INTR_NEGEDGE);
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
-    gpio_isr_handler_add(sw_gpio, gpio_isr_handler, NULL);
+    gpio_isr_handler_add(sw_gpio, gpio_isr_handler, nullptr);
 }

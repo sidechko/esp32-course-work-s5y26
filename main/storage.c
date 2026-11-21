@@ -17,7 +17,7 @@ void init_nvs()
 }
 
 esp_err_t save_mifare_card_to_nvs(mifare_card_data_handle_t card_h, const char *key) {
-    if (card_h == NULL || card_h->block_data == NULL || key == NULL) {
+    if (card_h == nullptr || card_h->block_data == nullptr || key == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -60,13 +60,13 @@ esp_err_t save_mifare_card_to_nvs(mifare_card_data_handle_t card_h, const char *
 }
 
 mifare_card_data_handle_t load_mifare_card_from_nvs(const char *key) {
-    if (key == NULL) return NULL;
+    if (key == nullptr) return nullptr;
 
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
-        return NULL;
+        return nullptr;
     }
 
     // 1. Читаем количество блоков
@@ -77,21 +77,21 @@ mifare_card_data_handle_t load_mifare_card_from_nvs(const char *key) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read block count: %s", esp_err_to_name(err));
         nvs_close(nvs_handle);
-        return NULL;
+        return nullptr;
     }
 
     // 2. Выделяем память под структуру и данные
     mifare_card_data_handle_t card_h = malloc(sizeof(mifare_card_data_t));
-    if (card_h == NULL) {
+    if (card_h == nullptr) {
         nvs_close(nvs_handle);
-        return NULL;
+        return nullptr;
     }
     card_h->block_count = block_count;
     card_h->block_data = malloc(block_count * MIFARE_BLOCK_SIZE);
-    if (card_h->block_data == NULL) {
+    if (card_h->block_data == nullptr) {
         free(card_h);
         nvs_close(nvs_handle);
-        return NULL;
+        return nullptr;
     }
 
     // 3. Читаем blob с данными блоков
@@ -105,7 +105,7 @@ mifare_card_data_handle_t load_mifare_card_from_nvs(const char *key) {
         ESP_LOGE(TAG, "Failed to read block data: %s", esp_err_to_name(err));
         free(card_h->block_data);
         free(card_h);
-        return NULL;
+        return nullptr;
     }
 
     ESP_LOGI(TAG, "Card data loaded from NVS with key '%s' (%u blocks)", key, block_count);
