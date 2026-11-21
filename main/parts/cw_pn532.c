@@ -109,7 +109,7 @@ mifare_card_data_handle_t read_mifare_classic(pn532_dev_handle_t dev) {
     }
 
     for (int i = 0; i < count; i++) {
-        err = read_mifare_classic_block(dev, new_card, i, 1000);
+        err = read_mifare_classic_block(dev, new_card, i, 100);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Read failed at block %d: %s", i, esp_err_to_name(err));
             free(new_card->block_data);
@@ -125,16 +125,16 @@ esp_err_t write_mifare_classic_block(pn532_dev_handle_t dev, const uint8_t* data
     esp_err_t err = select_and_auth(dev, block_number, nullptr);
     if (err != ESP_OK) return err;
 
-    if (!pn532_14443_block_write(dev, block_number, data_to_write, MIFARE_BLOCK_SIZE)) {
+    if (pn532_14443_block_write(dev, block_number, data_to_write, MIFARE_BLOCK_SIZE)) {
         ESP_LOGE(TAG, "Failed to write block %d", block_number);
         pn532_release_target(dev);
         return ESP_FAIL;
     }
 
     // Небольшая задержка, чтобы карта успела сохранить данные
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(20));
     pn532_release_target(dev);
-    ESP_LOGI(TAG,"Card read finished.");
+    ESP_LOGI(TAG,"Card write finished.");
     return ESP_OK;
 }
 
@@ -158,7 +158,7 @@ esp_err_t write_mifare_classic(pn532_t* dev, mifare_card_data_handle_t card_h) {
     // Если карта Gen1a и была разблокирована, запись пройдёт.
     // Если карта Gen2 (CUID), запись тоже пройдёт стандартным образом.
     const uint8_t* block0_data = card_h->block_data;
-    esp_err_t err = write_mifare_classic_block(dev, block0_data, 0, 1000);
+    esp_err_t err = write_mifare_classic_block(dev, block0_data, 0, 100);
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Block 0 (UID) written successfully. Target was a magic card (Gen1a or Gen2).");
@@ -236,5 +236,91 @@ esp_err_t pn532_gen1a_unlock(pn532_t* dev) {
     }
 
     ESP_LOGI(TAG, "Gen1a unlock sequence completed. Block 0 should now be writable.");
+    return ESP_OK;
+}
+
+esp_err_t emulate_mifare_card(pn532_t* dev, mifare_card_data_handle_t card_h) {
+    if (dev == NULL || card_h == NULL || card_h->block_data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 1. Подготовка параметров TgInitAsTarget для Mifare Classic (PICC mode)
+    //    Структура кадра: D4 8C <Mode> <MifareParams (6 байт)> <FeliCaParams (18 байт)> ...
+    //    Для Mifare Classic используется только MifareParams: SENS_RES (2 байта), SEL_RES (1 байт), UID (4 байта).
+    //    SENS_RES для Mifare Classic 1K: 0x00 0x04 (ATQA)
+    //    SEL_RES: 0x08 (SAK)
+    //    UID берётся из первых 4 байт блока 0 ( card_h->block_data[0..3] )
+    const uint8_t sens_res[2] = {0x00, 0x04};
+    const uint8_t sel_res = 0x08; // SAK для Mifare Classic 1K
+    const uint8_t* uid = card_h->block_data; // UID хранится в первых 4 байтах блока 0
+
+    // Формируем параметры для TgInitAsTarget
+    // Mode = 0x00 (PICC mode, passive)
+    // MifareParams = SENS_RES[0] SENS_RES[1] SEL_RES UID[0] UID[1] UID[2] UID[3]
+    // Остальные параметры (FeliCa, NFCID3, Length, etc.) заполняются нулями или опускаются.
+    uint8_t tg_init_params[6 + 18 + 1 + 1 + 1] = {0}; // Упрощённый буфер
+    size_t param_idx = 0;
+
+    // Mode
+    tg_init_params[param_idx++] = 0x00; // PICC only, passive
+
+    // MifareParams (6 байт)
+    tg_init_params[param_idx++] = sens_res[0];
+    tg_init_params[param_idx++] = sens_res[1];
+    tg_init_params[param_idx++] = sel_res;
+    tg_init_params[param_idx++] = uid[0];
+    tg_init_params[param_idx++] = uid[1];
+    tg_init_params[param_idx++] = uid[2];
+    tg_init_params[param_idx++] = uid[3];
+    // FeliCaParams (18 байт) — оставляем нулями, так как эмулируем Mifare
+
+    // 2. Отправка команды TgInitAsTarget (0x8C)
+    uint8_t response[32];
+    size_t response_len = sizeof(response);
+    bool success = pn532_execute_command(dev, 0x8C, tg_init_params, param_idx, response, &response_len, 1000);
+    if (!success) {
+        ESP_LOGE(TAG, "TgInitAsTarget failed. Card emulation not started.");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Card emulation started (UID: %02X%02X%02X%02X)", uid[3], uid[2], uid[1], uid[0]);
+
+    // 3. Ожидание и обработка запросов от считывателя (TgGetData / TgSetData)
+    //    В реальном сценарии здесь нужно циклически вызывать TgGetData, анализировать команды
+    //    (например, READ 0x30 <block>), и отвечать через TgSetData.
+    //    Для краткости приведён только каркас.
+    for (int i = 0; i < 10; i++) { // Ограничим цикл, чтобы не блокировать навсегда
+        uint8_t tg_data_cmd = 0x86; // TgGetData
+        uint8_t tg_data_response[64];
+        size_t tg_data_len = sizeof(tg_data_response);
+        success = pn532_execute_command(dev, tg_data_cmd, NULL, 0, tg_data_response, &tg_data_len, 1000);
+
+        if (success && tg_data_len > 0) {
+            // Анализ полученной команды от считывателя
+            // Например, если пришла команда READ (0x30) с номером блока,
+            // можно попытаться отправить данные через TgSetData (0x8E).
+            // Это упрощённая логика; в реальности требуется полноценный парсер ISO14443-3.
+            ESP_LOGI(TAG, "Received data from reader (len=%u)", tg_data_len);
+
+            // Пример: если команда — READ (0x30) блока 0, отправляем блок 0
+            if (tg_data_response[0] == 0x30) {
+                uint8_t block_num = tg_data_response[1];
+                if (block_num < card_h->block_count) {
+                    const uint8_t* block_data = card_h->block_data + (block_num * MIFARE_BLOCK_SIZE);
+                    // Формируем ответ TgSetData: 0x8E <DataOut>
+                    uint8_t set_data_params[1 + MIFARE_BLOCK_SIZE];
+                    set_data_params[0] = 0x00; // Tg (target number)
+                    memcpy(&set_data_params[1], block_data, MIFARE_BLOCK_SIZE);
+                    size_t set_resp_len = sizeof(response);
+                    pn532_execute_command(dev, 0x8E, set_data_params, sizeof(set_data_params), response, &set_resp_len, 1000);
+                }
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+
+    // 4. Завершение эмуляции (опционально)
+    //    Можно отправить TgInitAsTarget с Mode = 0x02 (release) или просто сбросить поле.
+    ESP_LOGI(TAG, "Card emulation stopped.");
     return ESP_OK;
 }

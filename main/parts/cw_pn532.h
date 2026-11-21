@@ -24,5 +24,7 @@ esp_err_t write_mifare_classic_block(pn532_dev_handle_t dev, const uint8_t* data
 
 esp_err_t write_mifare_classic(pn532_dev_handle_t dev, mifare_card_data_handle_t card_h);
 esp_err_t pn532_gen1a_unlock(pn532_t* dev);
+//Нестабильная штука на самом деле
+esp_err_t emulate_mifare_card(pn532_t* dev, mifare_card_data_handle_t card_h);
 
 #endif // CWS5Y26_PN532_H
