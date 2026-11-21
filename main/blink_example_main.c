@@ -63,14 +63,14 @@ int acb_seg_count = 0;
 int selected_num = 0;
 int selected_menu = 4;
 /*
-    0bABCDE
-    A - Menu click bit
-    B - ACB state change bit
-    C - Number change bit
-    D - Menu selected entry change bit
-    E - Menu change bit
+    0bBCDEF
+    B - Menu click bit
+    C - ACB state change bit
+    D - Number change bit
+    E - Menu selected entry change bit
+    F - Menu change bit
 */
-uint8_t state_changed = 0b01110;
+volatile uint8_t state_changed = 0b01110;
 
 //function
 void display_static_content();
@@ -78,20 +78,20 @@ void display_selected_number();
 void display_selected_menu();
 bool recalc_acb_seg();
 void display_acb();
-esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid);
+uint16_t get_mifare_classic_block_count();
+esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid, int32_t timeout);
 
-#define MIN_INTERVAL_US 1000
-static volatile int64_t last_isr_time = 0;
+#define MIN_INTERVAL_US 200000
+static volatile long last_isr_time = 0;
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    int now = esp_timer_get_time();
+    long now = esp_timer_get_time();
     if (now - last_isr_time < MIN_INTERVAL_US)
         return;
     if(state_changed & BUTTON_CLICK_BIT)
         return;
     last_isr_time = now;
     state_changed |= BUTTON_CLICK_BIT;
-    ESP_EARLY_LOGI(TAG,"Click!");
 }
 
 void init()
@@ -223,7 +223,7 @@ void init()
 
     esp_log_level_set("_ssd1306_bitmaps", ESP_LOG_INFO);
     esp_log_level_set("ssd1306_copy_bit", ESP_LOG_INFO);
-    esp_log_level_set("PN532", ESP_LOG_DEBUG);
+    esp_log_level_set("PN532", ESP_LOG_WARN);
     
 }
 
@@ -232,8 +232,9 @@ uint8_t upd_count = 0;
 
 
 #define MIFARE_BLOCK_SIZE 16
+#define UID_SIZE 7
 uint8_t block_data[MIFARE_BLOCK_SIZE];
-uint8_t curr_uid[7];
+uint8_t curr_uid[UID_SIZE];
 
 void app_main(void)
 {
@@ -281,19 +282,21 @@ void app_main(void)
         
         //WORK
         if(state_changed & BUTTON_CLICK_BIT){
-            state_changed ^= BUTTON_CLICK_BIT;
-            ESP_LOGI(TAG,"Handle");
 
             if(state_changed & MENU_ACTIVE_BIT){
                 switch(selected_menu){
                     case 0:
-                        ESP_LOGI(TAG,"Selected: %d",selected_menu);
-                        esp_err_t err = read_mifare_classic_block(4, block_data, curr_uid);
-                        if (err == ESP_OK) {
-                            ESP_LOG_BUFFER_HEX("UUID", curr_uid, 7);
-                            ESP_LOG_BUFFER_HEX("Mifare block 4", block_data, MIFARE_BLOCK_SIZE);
-                        } else {
-                            ESP_LOGE("Mifare", "Read failed: %s", esp_err_to_name(err));
+                        int32_t count = get_mifare_classic_block_count();
+                        ESP_LOGI(TAG, "Count: %d", count);
+                        for(int i = 0; i < count; i++){
+                            esp_err_t err = read_mifare_classic_block(i, block_data, curr_uid, 1000);
+                            if (err == ESP_OK) {
+                                if(i == 0)
+                                    ESP_LOG_BUFFER_HEX("UUID", curr_uid, 7);
+                                ESP_LOG_BUFFER_HEX("    ", block_data, MIFARE_BLOCK_SIZE);
+                            } else {
+                                ESP_LOGE(TAG, "Read failed: %s", esp_err_to_name(err));
+                            }
                         }
                         break;
                     case 1:
@@ -304,10 +307,12 @@ void app_main(void)
                 selected_menu = 4;
             }
             else{
+                
                 selected_menu = 0;
             }
-            state_changed ^= MENU_ACTIVE_BIT;
             state_changed |= MENU_CHANGE_BIT;
+            state_changed ^= MENU_ACTIVE_BIT;
+            state_changed &= ~BUTTON_CLICK_BIT;
         }
 
         //DISPLAY
@@ -322,7 +327,7 @@ void app_main(void)
         }
 
 
-        state_changed &= MENU_ACTIVE_BIT;
+        state_changed &= (BUTTON_CLICK_BIT | MENU_ACTIVE_BIT);
     }
 }
 
@@ -439,22 +444,35 @@ void display_selected_menu()
     ssd1306_bitmaps(&dev, 0, 44, hud_button_exit, 40, 9, selected_menu == 3);
 }
 
+uint16_t get_mifare_classic_block_count(void) {
+    uint8_t dummy[16];
+    uint8_t dummy_uid[7];
 
-esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid) {
-    uint8_t uid[7];
+    esp_err_t err = read_mifare_classic_block(255, dummy, dummy_uid, 1000);
+    if (err == ESP_OK) {
+        return 256;
+    }
+
+    err = read_mifare_classic_block(63, dummy, dummy_uid, 1000);
+    if (err == ESP_OK) {
+        return 64;
+    }
+
+    return 0;
+}
+
+esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uint8_t *out_uid, int32_t timeout) {
+    uint8_t uid[UID_SIZE];
     uint8_t uid_len;
     uint8_t response[32];
     uint8_t response_len;
-    ESP_LOGI(TAG, "Start");
 
-    esp_err_t err = pn532_read_passive_target_id(&pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_len, 0);
+    esp_err_t err = pn532_read_passive_target_id(&pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_len, timeout);
     if (err != ESP_OK) return err;
-    ESP_LOGD(TAG, "pn532_read_passive_target_id OK");
 
     // 2. Выбор карты
     err = pn532_in_list_passive_target(&pn532_io);
     if (err != ESP_OK) return err;
-    ESP_LOGD(TAG, "pn532_in_list_passive_target OK");
 
     // 3. UID для аутентификации (последние 4 байта для 7-байтных карт)
     const uint8_t *auth_uid = (uid_len == 7) ? &uid[3] : uid;
@@ -477,5 +495,6 @@ esp_err_t read_mifare_classic_block(uint8_t block_number, uint8_t *out_data, uin
     if (err != ESP_OK) return err;
 
     memcpy(out_data, response, MIFARE_BLOCK_SIZE);
+    memcpy(out_uid, uid, UID_SIZE);
     return ESP_OK;
 }
