@@ -64,6 +64,11 @@ esp_err_t get_mifare_classic_block_count(pn532_dev_handle_t dev, int* count) {
         *count = 64;
         return ESP_OK;
     }
+    err = read_mifare_classic_block(dev, nullptr, 0, 1000);
+    if (err == ESP_OK) {
+        *count = 1;
+        return ESP_OK;
+    }
     *count = 0;
     return err;
 }
@@ -100,6 +105,7 @@ mifare_card_data_handle_t read_mifare_classic(pn532_dev_handle_t dev) {
         free(new_card);
         return nullptr;
     }
+    ESP_LOGI(TAG, "Block count: %d", count);
 
     new_card->block_count = count;
     new_card->block_data = malloc(count * MIFARE_BLOCK_SIZE);

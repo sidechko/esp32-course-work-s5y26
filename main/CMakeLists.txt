@@ -6,6 +6,7 @@ idf_component_register(
         "parts/encoder.h" "parts/encoder.c"
         "parts/battery.h" "parts/battery.c"
         "storage.h" "storage.c"
+        "card_detect.h" "card_detect.c"
         INCLUDE_DIRS "."
         PRIV_REQUIRES esp_driver_pcnt esp_driver_gpio esp_adc esp_timer nvs_flash
         INCLUDE_DIRS ".")

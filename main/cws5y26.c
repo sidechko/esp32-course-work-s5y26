@@ -1,3 +1,4 @@
+#include "card_detect.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -145,10 +146,12 @@ void init()
 
 char* buffer;
 mifare_card_data_handle_t curent_card;
+card_info_t info;
 
 void app_main(void)
 {
     init();
+    buffer = malloc(sizeof(char) * 2);
     //MAIN LOOP
     display_static_content(&display_dev);
     while (true)
@@ -169,29 +172,44 @@ void app_main(void)
                 switch (selected_menu)
                 {
                 case 0:
+                    err = detect_card_type(pn532_dev, &info);
+                    if (err != ESP_OK)
+                    {
+                        ESP_LOGE(TAG, "Detection failed");
+                        break;
+                    }
+                    ESP_LOGI(TAG, "Detected: %s", card_type_to_string(info.type));
+                    ESP_LOGI(TAG, "  UID: %02X%02X%02X%02X (len=%u)",
+                             info.uid[3], info.uid[2], info.uid[1], info.uid[0], info.uid_len);
+                    ESP_LOGI(TAG, "  Blocks: %u x %u bytes", info.block_count, info.block_size);
+                    ESP_LOGI(TAG, "  Magic: %s, UID writable: %s",
+                             info.is_magic ? "yes" : "no",
+                             info.uid_writable ? "yes" : "no");
+
                     ESP_LOGI(TAG, "Start reading");
                     curent_card = read_mifare_classic(pn532_dev);
                     if (curent_card != nullptr)
                     {
                         log_card(curent_card);
+                        save_mifare_card_to_nvs(curent_card, buffer);
                         err = ESP_OK;
                     }
                     ESP_LOGI(TAG, "End reading");
                     break;
                 case 1:
                     ESP_LOGI(TAG, "Start writing");
+                    curent_card = load_mifare_card_from_nvs(buffer);
                     err = write_mifare_classic(pn532_dev, curent_card);
                     if (err != ESP_OK)
                         ESP_LOGI(TAG, "Error writing mifare_classic");
-                    else
-                        save_mifare_card_to_nvs(curent_card, buffer);
                     ESP_LOGI(TAG, "End writing");
                     break;
                 case 2:
                     ESP_LOGI(TAG, "Start emulate");
                     curent_card = load_mifare_card_from_nvs(buffer);
-                    err = emulate_mifare_card(pn532_dev,curent_card);
+                    err = emulate_mifare_card(pn532_dev, curent_card);
                     ESP_LOGI(TAG, "End emulate");
+                    break;
                 default:
                     ESP_LOGI(TAG, "Exit, log current selected card");
                     curent_card = load_mifare_card_from_nvs(buffer);

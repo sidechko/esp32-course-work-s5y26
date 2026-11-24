@@ -1,0 +1,351 @@
+{
+  "path": "Offline/CourseWork",
+  "foldername": "CourseWork",
+  "name": "CourseWork",
+  "title": "CourseWork",
+  "uuid": "5f62456db5ce6435bd8d91876659715a",
+  "created_at": "2026-11-22 04:16:02",
+  "updated_at": "2026-11-24 12:58:34",
+  "documents": [
+    {
+      "uuid": "0578e223812e684d298b0ce00f737c67",
+      "title": "Sheet_1",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "updateTime": 1795298037,
+      "createTime": 1795273314,
+      "histories": [],
+      "created_at": "2026-11-21 22:01:54",
+      "updated_at": "2026-11-22 04:53:57",
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "TP4056",
+          2,
+          "TP4056-CHARGING-MODULE_TP4056",
+          "AP1,AP2",
+          {
+            "Manufacturer Part": "TP4056",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Li Ion",
+          2,
+          "BAT-SMD_CR1220-2",
+          "B1,B2",
+          {
+            "Manufacturer Part": "CR1220-2",
+            "Manufacturer": "Q&J",
+            "Supplier": "LCSC",
+            "Supplier Part": "C70381"
+          }
+        ],
+        [
+          "0.47u",
+          2,
+          "C0603",
+          "C1,C2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Дисплей",
+          2,
+          "SSD1306-OLED-128X64-I2C",
+          "LCD1,LCD2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "10k",
+          6,
+          "R0603",
+          "R1,R2,R4,R6,R7,R8",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "47k",
+          2,
+          "R0603",
+          "R3,R5",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Сдвиговый переключатель",
+          2,
+          "SWITCH-ESWITCH-SLIDE-TH-EG1218",
+          "S1,S2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Энкодер KY-040",
+          2,
+          "KY-040",
+          "U1,U6",
+          {
+            "Manufacturer Part": "KY-040",
+            "Manufacturer": "AZDelivery",
+            "Supplier": "Pollin",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "ESP32-30P",
+          2,
+          "ESP32-DEVKITV1_ESP32-DEVKITV1-30PINS FROM IMUNTLAK BUT FIXED",
+          "U2,U7",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "TPS63020",
+          2,
+          "TPS63020",
+          "U3,U5",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Модуль чтения RFID",
+          2,
+          "PN532 MODULE",
+          "U4,U8",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ]
+      ],
+      "components": {
+        "6b197bf50f6e4569a401d973a59ff5ec": 1,
+        "b9149702eeff4e109a9bc3ac5d51af4a": 1,
+        "469fb6d4284a422dbfca83991c2d7519": 1,
+        "89b8d1ecae204a309e5a4b5b3f839105": 1,
+        "b0c2d7603adc4d738b29c9aa01c091fa": 1,
+        "d5c686c169bf450286a65838cdfca7fc": 1,
+        "67082a4ee642ac71e2dcdf6758d8dd66": 1,
+        "bb009484ef804a24ac5d18c54b249586": 4,
+        "24eeb2ceca08480b92b847b6a310acda": 1,
+        "5c04930b2c034965ab77896e7c7bb555": 1
+      }
+    },
+    {
+      "uuid": "18d9bb5e45191263898f0477d52a9328",
+      "title": "Sheet_2",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {
+        "89b8d1ecae204a309e5a4b5b3f839105": 1,
+        "469fb6d4284a422dbfca83991c2d7519": 1,
+        "67082a4ee642ac71e2dcdf6758d8dd66": 1,
+        "bb009484ef804a24ac5d18c54b249586": 4,
+        "5c04930b2c034965ab77896e7c7bb555": 1,
+        "24eeb2ceca08480b92b847b6a310acda": 1,
+        "b0c2d7603adc4d738b29c9aa01c091fa": 1,
+        "d5c686c169bf450286a65838cdfca7fc": 1,
+        "b9149702eeff4e109a9bc3ac5d51af4a": 1,
+        "6b197bf50f6e4569a401d973a59ff5ec": 1
+      },
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "TP4056",
+          2,
+          "TP4056-CHARGING-MODULE_TP4056",
+          "AP1,AP2",
+          {
+            "Manufacturer Part": "TP4056",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Li Ion",
+          2,
+          "BAT-SMD_CR1220-2",
+          "B1,B2",
+          {
+            "Manufacturer Part": "CR1220-2",
+            "Manufacturer": "Q&J",
+            "Supplier": "LCSC",
+            "Supplier Part": "C70381"
+          }
+        ],
+        [
+          "0.47u",
+          2,
+          "C0603",
+          "C1,C2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Дисплей",
+          2,
+          "SSD1306-OLED-128X64-I2C",
+          "LCD1,LCD2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "10k",
+          6,
+          "R0603",
+          "R1,R2,R4,R6,R7,R8",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "47k",
+          2,
+          "R0603",
+          "R3,R5",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Сдвиговый переключатель",
+          2,
+          "SWITCH-ESWITCH-SLIDE-TH-EG1218",
+          "S1,S2",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Энкодер KY-040",
+          2,
+          "KY-040",
+          "U1,U6",
+          {
+            "Manufacturer Part": "KY-040",
+            "Manufacturer": "AZDelivery",
+            "Supplier": "Pollin",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "ESP32-30P",
+          2,
+          "ESP32-DEVKITV1_ESP32-DEVKITV1-30PINS FROM IMUNTLAK BUT FIXED",
+          "U2,U7",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "TPS63020",
+          2,
+          "TPS63020",
+          "U3,U5",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "Модуль чтения RFID",
+          2,
+          "PN532 MODULE",
+          "U4,U8",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "",
+            "Supplier Part": ""
+          }
+        ]
+      ],
+      "updateTime": 1795499914,
+      "createTime": 1795298021,
+      "histories": [],
+      "created_at": "2026-11-22 04:53:41",
+      "updated_at": "2026-11-24 12:58:34"
+    }
+  ],
+  "content": "",
+  "stick": "",
+  "sort": [
+    "0578e223812e684d298b0ce00f737c67",
+    "18d9bb5e45191263898f0477d52a9328"
+  ],
+  "schfilename": "CourseWork.json",
+  "schfilemtime": 1795499914081
+}
